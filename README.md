@@ -86,7 +86,7 @@ Below is an explanation of the columns in the table that the function produces:
 * win = Window size value, window size of the packets from A to B indicate how much buffer space is available on A for receiving packets. So when B receives a packet with window size 1, it would tell B how many bytes it is allowed to send to A.
 * tsval = Timestamp value, arbitrary time value to send to B from A and await echo reply, e.g. in packet 1
 * tsecr = Timestamp echo reply, tsval number from previous packet sent back to A from B, e.g. in packet 2.
-Timestamp values gradually increment as packets are sent back and forth, they let tcp know the state of the network connection between src and dest, e.g. to establish network latency or to improve throughput
+  * tsval and tsecr values gradually increment as packets are sent back and forth, they let tcp know the state of the network connection between src and dest, e.g. to establish network latency or to improve throughput
 * length = The length, in bytes, of the packet data (not including packet header)
 * len = The length, in bytes, of the data content (payload)
 * data = The data content (payload)
