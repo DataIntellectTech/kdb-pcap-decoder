@@ -91,4 +91,4 @@ Below is an explanation of the columns in the table that the function produces:
 * len = The length, in bytes, of the data content (payload)
 * data = The data content (payload)
 
-All columns are populated from the packet data apart from time and length which is populated from the packet header.
+All of the columns are populated from the packet data apart from time and length which is populated from the packet header.
