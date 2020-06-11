@@ -66,7 +66,7 @@ The structure of a .pcap file is formed as follows:
 
 #### Packet Header
 16 bytes
-Contains the timestamp and the length of the packet data. The length field is used by the kdb+ code to iterate through each of the packets and grab the same fields each time
+Contains the timestamp and the length of the packet data. The length field is used by the kdb+ code to iterate through each of the packets and grab the same fields each time.
 
 More information on the global and packet headers can be found here: https://wiki.wireshark.org/Development/LibpcapFileFormat
 
@@ -91,4 +91,4 @@ Below is an explanation of the columns in the table that the function produces:
 * len = The length, in bytes, of the data content (payload)
 * data = The data content (payload)
 
-All of the columns are populated from the packet data apart from time and length which is populated from the packet header.
+All of the columns are populated from the packet data apart from time and length which are populated from the packet header.
