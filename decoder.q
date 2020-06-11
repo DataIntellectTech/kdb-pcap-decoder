@@ -55,7 +55,7 @@ linuxtokdbtime:{
  }
 
 getflags:{[n;x]
- bools: raze raze "b"$ 2 vs ((enlist 2;enlist "h")1:2#(24+16+48+x[0]) _ n) mod 32768;
+ bools: raze "b"$ 2 vs 1#(24+16+49+x[0]) _ n;
  `CWR`ECE`URG`ACK`PSH`RST`SYN`FIN where ((8 - count bools)#0b), bools
  }
 
