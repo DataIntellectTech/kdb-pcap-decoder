@@ -1,81 +1,78 @@
 \d .pcap
 
-// size of headers in bytes
+// size of headers in bytes and dict of protocol code conversions
 globheader: 24;
 packetheader: 16;
+allcodes:(enlist 6)!(enlist `TCP);
 
 
 buildtable:{[file]
- data:1_ last each {[n] // initial x and byte cut points removed from array list to make table
-  filebytesize:count n;
+ // initial x and byte cut points removed from array list to make table
+ // gettablerow is iterated over each datapacket, extracting data
 
-  // iterates through packets, extracting data 
-  gettablerow[n;]\[{y>(first x[0])+40}[;filebytesize];(),0]
-  } read1 file;
-
- data
+ data:1_ last each {[n]
+  filebytesize: count n;
+  gettablerow[n;]\[{y>(first x[0])+40}[;filebytesize];(),0]    
+  } read1 file
  }
 
 
-gettablerow:{[n;x] 
-   // table row data
+gettablerow:{[n;x]  // data for a single row
+ length: 1 sv n[x[0] + 36 40];
+ data:   datafromfile[n;x;68;length - 68];
+ flags:  getflags[n;x];
+ time:   gettime[n;x];
+ len:    count data;
+
+ ips: getips[n;x]; 
+ src:  ips[0];
+ dest: ips[1];
+
+ info: getinfo[n;x];
+ srcport:  info[0] mod 65536;
+ destport: info[1] mod 65536;
+ seq:      info[2] mod 4294967296;
+ ack:      info[3] mod 4294967296;
+ win:      info[4] mod 65536;
+ tsval:    info[5] mod 4294967296;
+ tsecr:    info[6] mod 4294967296;
    
-   time: gettime[n;x];
-   length: 1 sv n[x[0] + 36 40]; 
-   data: (length - 68)#(globheader+packetheader+68+x[0]) _ n;
-   flags: getflags[n;x];
-   len: count data;
+ code: getcode[n;x]; 
+ protocol: $[code in key allcodes; allcodes[code]; code];
  
-   src: getips[28;n;x];
-   dest: getips[32;n;x];
-
-   srcport: getports[36;n;x];
-   destport: getports[38;n;x];
-   
-   seq: getinfo[40;n;x;"i";4;4294967296];
-   ack: getinfo[44;n;x;"i";4;4294967296];
-   tsval: getinfo[60;n;x;"i";4;4294967296];
-   tsecr: getinfo[64;n;x;"i";4;4294967296];
-   win: getinfo[50;n;x;"h";2;65536];
-   
-   // dict of protocol code conversions 
-   codes:(enlist 6)!(enlist `TCP);
-   protocol: $[getcode[n;x] in key codes; codes[getcode[n;x]]; getcode[n;x]];
-
-   // array containing starting point for next byte and dictionary of data for current packet
-   (x[0] + length + 16;`time`src`dest`srcport`destport`protocol`flags`seq`ack`win`tsval`tsecr`length`len`data!(time;src;dest;srcport;destport;protocol;flags;seq;ack;win;tsval;tsecr;length;len;data))
-   }
+ // array containing starting point for next byte and dictionary of data for current packet
+ (x[0] + length + 16;`time`src`dest`srcport`destport`protocol`flags`seq`ack`win`tsval`tsecr`length`len`data!(time;src;dest;srcport;destport;protocol;flags;seq;ack;win;tsval;tsecr;length;len;data))
+ }
 
 
-gettime:{[n;x] linuxtokdbtime ("iiii";4 4 4 4)1:16#(24+x[0]) _ n }
+gettime:{[n;x] linuxtokdbtime ("iiii";4 4 4 4)1: packetheader#(globheader+x[0]) _ n }
 
 linuxtokdbtime:{
  // converts time in global header to nanoseconds then accounts for difference in epoch dates in kdb and linux
  "p"$1000*x[1]+1000000*x[0]-10957*86400
  }
 
+datafromfile:{[n;x;start;numofbytes]
+ numofbytes#(globheader+packetheader+x[0]+start) _ n
+ }
+
 getflags:{[n;x]
- bools: raze "b"$ 2 vs 1#(24+16+49+x[0]) _ n;
+ // flag data stored at 49th byte
+ bools: "b"$ 2 vs n[globheader+packetheader+x[0]+49];
  `CWR`ECE`URG`ACK`PSH`RST`SYN`FIN where ((8 - count bools)#0b), bools
  }
 
 getcode:{[n;x]
  // code number is stored at 25th byte of packet
- ("i"$1#(globheader+packetheader+25+x[0]) _ n)[0]
+ "i"$n[globheader+packetheader+x[0]+25]
  }
 
-getinfo:{[byte;n;x;converttype;bytechunk;typemax]
- // byte is starting point, bytechunk is amount taken
- // mod value is 1 + max value of typemax
- ((enlist bytechunk;enlist converttype)1: bytechunk #(globheader+packetheader+byte+x[0]) _ n) mod typemax
- };
+getinfo:{[n;x]
+ // grabs multiple sets of data starting at 36th byte
+ (2 2 4 4 2 2 8 4 4;"hhii h ii")1: datafromfile[n;x;36;32]
+ }
 
-getips:{[byte;n;x]
- `$"." sv ' string 4 cut "i"$4#(globheader+packetheader+byte+x[0]) _ n
- };
-
-getports: {[byte;n;x]
- // mod value is the max value of shorts
- `$ string ((enlist 2;enlist "h")1: 2#(globheader+packetheader+byte+x[0]) _ n) mod 65536
- };
-
+getips:{[n;x]
+ // ip data starts at 28th byte
+ `$"." sv ' string 4 cut "i"$datafromfile[n;x;28;8]
+ }
