@@ -13,16 +13,25 @@ buildtable:{[file]
  data:1_ last each {[n]
   filebytesize: count n;
   gettablerow[n;]\[{y>(first x[0])+40}[;filebytesize];(),0]    
-  } read1 file
+  } read1 file;
+ 
+ data: update No:i+1 from data;
+ `No xcols data
  }
 
 
 gettablerow:{[n;x]  // data for a single row
- length: 1 sv n[x[0] + 36 40];
- data:   datafromfile[n;x;68;length - 68];
- flags:  getflags[n;x];
- time:   gettime[n;x];
- len:    count data;
+ time:     gettime[n;x];
+ flags:    getflags[n;x];
+ protocol: getprotocol[n;x];
+ 
+ totallength: (enlist 2;enlist "h")1: datafromfile[n;x;18;2];
+ IPheader:    4*"J"$last string n[x[0]+globheader+packetheader+16];
+ TCPheader:   4* first "0123456789abcdef"?/:string n[x[0]+globheader+packetheader+48];
+ len:         (first first totallength - IPheader + TCPheader) mod 65536;
+
+ length: first raze ((enlist "h";enlist 2)1: n[x[0]+36 37]) mod 65536;
+ data:   datafromfile[n;x;length - len;len];
 
  ips: getips[n;x]; 
  src:  ips[0];
@@ -36,16 +45,15 @@ gettablerow:{[n;x]  // data for a single row
  win:      info[4] mod 65536;
  tsval:    info[5] mod 4294967296;
  tsecr:    info[6] mod 4294967296;
-   
- code: getcode[n;x]; 
- protocol: $[code in key allcodes; allcodes[code]; code];
- 
+
  // array containing starting point for next byte and dictionary of data for current packet
  (x[0] + length + 16;`time`src`dest`srcport`destport`protocol`flags`seq`ack`win`tsval`tsecr`length`len`data!(time;src;dest;srcport;destport;protocol;flags;seq;ack;win;tsval;tsecr;length;len;data))
  }
 
 
-gettime:{[n;x] linuxtokdbtime ("iiii";4 4 4 4)1: packetheader#(globheader+x[0]) _ n }
+gettime:{[n;x]
+ linuxtokdbtime ("iiii";4 4 4 4)1: packetheader#(globheader+x[0]) _ n
+ }
 
 linuxtokdbtime:{
  // converts time in global header to nanoseconds then accounts for difference in epoch dates in kdb and linux
@@ -58,21 +66,22 @@ datafromfile:{[n;x;start;numofbytes]
 
 getflags:{[n;x]
  // flag data stored at 49th byte
- bools: "b"$ 2 vs n[globheader+packetheader+x[0]+49];
- `CWR`ECE`URG`ACK`PSH`RST`SYN`FIN where ((8 - count bools)#0b), bools
+ bools: 2 vs n[globheader+packetheader+x[0]+49];
+ `CWR`ECE`URG`ACK`PSH`RST`SYN`FIN where ((8 - count bools)#0), bools
  }
 
-getcode:{[n;x]
+getprotocol:{[n;x]
  // code number is stored at 25th byte of packet
- "i"$n[globheader+packetheader+x[0]+25]
+ code: "i"$n[globheader+packetheader+x[0]+25];
+ protocol: $[code in key allcodes; allcodes[code]; code] 
  }
 
 getinfo:{[n;x]
  // grabs multiple sets of data starting at 36th byte
- (2 2 4 4 2 2 8 4 4;"hhii h ii")1: datafromfile[n;x;36;32]
+ ((2 2 4 4 2 2 8 4 4;"hhii h ii")1: datafromfile[n;x;36;32])
  }
 
 getips:{[n;x]
  // ip data starts at 28th byte
  `$"." sv ' string 4 cut "i"$datafromfile[n;x;28;8]
- }
+ } 
